@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "quantum.h"
 
 // clang-format off
-// Layers 0-2: keyball61_20260703.vil
+// Layers 0-2: keyball61_20260704.vil
 // Layer 3: Auto Mouse (trackball movement, H/J/K/L/; = mouse buttons)
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_universal(
@@ -34,19 +34,19 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
 
   [1] = LAYOUT_universal(
-    S(KC_ESC), KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,                                  KC_EQL   , S(KC_6)  , S(KC_RBRC), S(KC_NUHS), S(KC_9)  , S(KC_INT1),
-    S(KC_DEL), KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,                                  S(KC_Y)  , S(KC_U)  , S(KC_I)  , S(KC_O)  , S(KC_P)  , KC_LBRC  ,
-    S(KC_TAB), KC_F11   , KC_F12   , _______  , _______  , _______  ,                                  S(KC_H)  , S(KC_J)  , S(KC_K)  , S(KC_L)  , KC_QUOT  , S(KC_2)  ,
-    _______  , _______  , _______  , _______  , _______  , _______  , S(KC_RBRC),           S(KC_NUHS), S(KC_N)  , S(KC_M)  , KC_RBRC  , KC_NUHS  , S(KC_SLSH), A(KC_INT3),
-    _______  , S(KC_LCTL), S(KC_LALT), S(KC_LGUI), _______, _______  , _______  ,            _______  , _______  , KC_NO    , KC_NO    , KC_NO    , S(KC_RALT), _______
+    S(KC_ESC), KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,                                  _______  , _______  , S(KC_RBRC), S(KC_NUHS), S(KC_9)  , KC_DEL   ,
+    S(KC_DEL), KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,                                  _______  , _______  , _______  , _______  , _______  , KC_LBRC  ,
+    S(KC_TAB), KC_F11   , KC_F12   , _______  , _______  , _______  ,                                  _______  , _______  , _______  , _______  , KC_QUOT  , S(KC_2)  ,
+    _______  , _______  , _______  , _______  , _______  , _______  , _______  ,            _______  , _______  , _______  , KC_RBRC  , KC_NUHS  , S(KC_SLSH), A(KC_INT3),
+    _______  , S(KC_LCTL), S(KC_LALT), S(KC_LGUI), _______, _______  , _______  ,            _______  , _______  , KC_NO    , KC_NO    , KC_NO    , _______  , _______
   ),
 
   [2] = LAYOUT_universal(
     SSNP_FRE , KC_F1    , KC_F2    , KC_F3    , KC_F4    , KC_F5    ,                                  _______  , _______  , _______  , _______  , _______  , _______  ,
-    SSNP_VRT , KC_F6    , KC_F7    , KC_F8    , KC_F9    , KC_F10   ,                                  KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , _______  , KC_F12   ,
-    SSNP_HOR , KC_F11   , KC_F12   , KC_5     , KC_6     , S(KC_SCLN),                                 KC_LEFT  , KC_DOWN  , KC_UP    , KC_RGHT  , KC_BTN3  , _______  ,
-    _______  , _______  , KC_1     , KC_2     , KC_3     , S(KC_MINS), S(KC_8)  ,            S(KC_9)  , KC_PGDN  , _______  , _______  , _______  , _______  , KC_INT3  ,
-    _______  , _______  , KC_0     , KC_DOT   , _______  , _______  , _______  ,            KC_DEL   , _______  , KC_NO    , KC_NO    , KC_NO    , _______  , _______
+    SSNP_VRT , KC_F6    , KC_F7    , KC_F8    , KC_EQL   , S(KC_EQL),                                  KC_HOME  , KC_PGDN  , KC_PGUP  , KC_END   , _______  , _______  ,
+    SSNP_HOR , KC_F11   , KC_F12   , _______  , _______  , S(KC_SCLN),                                 KC_LEFT  , KC_DOWN  , KC_UP    , KC_RGHT  , _______  , _______  ,
+    _______  , _______  , _______  , _______  , _______  , S(KC_MINS), _______  ,            _______  , _______  , _______  , _______  , _______  , _______  , _______  ,
+    _______  , _______  , _______  , _______  , _______  , _______  , _______  ,            _______  , _______  , KC_NO    , KC_NO    , KC_NO    , _______  , _______
   ),
 
   [3] = LAYOUT_universal(
@@ -239,24 +239,50 @@ static void layer_rgb_update(layer_state_t state) {
 }
 #endif
 
-// Scroll output is slowed by KEYBALL_SCROLL_LAYER_SPEED
+// Scroll: boost light moves, compress fast moves per report, emit as soon as
+// enough distance accumulates (no time throttle — keeps response snappy).
 static int8_t clip2int8(int16_t v) {
     return (v) < -127 ? -127 : (v) > 127 ? 127 : (int8_t)v;
 }
 
+static int16_t scroll_shape_delta(int16_t delta) {
+    int16_t a = delta < 0 ? -delta : delta;
+    if (a == 0) {
+        return 0;
+    }
+    // Fast path: any report at/above LIGHT_MAX is always INPUT_MAX.
+    // Light path: bonus is largest for the smallest deltas and falls to 0 at
+    // LIGHT_MAX, so raising LIGHT_GAIN never speeds up fast moves.
+    //   out = a + (LIGHT_MAX - a) * LIGHT_GAIN / LIGHT_MAX   (a < LIGHT_MAX)
+    int16_t out;
+    if (a >= KEYBALL_SCROLL_LIGHT_MAX) {
+        out = KEYBALL_SCROLL_INPUT_MAX;
+    } else {
+        out = a + (int16_t)(KEYBALL_SCROLL_LIGHT_MAX - a) * KEYBALL_SCROLL_LIGHT_GAIN / KEYBALL_SCROLL_LIGHT_MAX;
+    }
+    return delta < 0 ? -out : out;
+}
+
+static int16_t scroll_consume_axis(int16_t *acc, int16_t delta) {
+    *acc += scroll_shape_delta(delta);
+
+    const int16_t acc_max = (int16_t)KEYBALL_SCROLL_LAYER_SPEED * KEYBALL_SCROLL_MAX_TICK;
+    if (*acc > acc_max) {
+        *acc = acc_max;
+    } else if (*acc < -acc_max) {
+        *acc = -acc_max;
+    }
+
+    int16_t ticks = *acc / KEYBALL_SCROLL_LAYER_SPEED;
+    *acc -= ticks * KEYBALL_SCROLL_LAYER_SPEED;
+    return ticks;
+}
+
 void keyball_on_apply_motion_to_mouse_scroll(report_mouse_t *report, report_mouse_t *output, bool is_left) {
-    int16_t x = report->x;
-    int16_t y = report->y;
+    int16_t x = scroll_consume_axis(&scroll_speed_h, report->x);
+    int16_t y = scroll_consume_axis(&scroll_speed_v, report->y);
     report->x = 0;
     report->y = 0;
-
-    scroll_speed_h += x;
-    scroll_speed_v += y;
-
-    x = scroll_speed_h / KEYBALL_SCROLL_LAYER_SPEED;
-    y = scroll_speed_v / KEYBALL_SCROLL_LAYER_SPEED;
-    scroll_speed_h -= x * KEYBALL_SCROLL_LAYER_SPEED;
-    scroll_speed_v -= y * KEYBALL_SCROLL_LAYER_SPEED;
 
 #if KEYBALL_MODEL == 61 || KEYBALL_MODEL == 39 || KEYBALL_MODEL == 147 || KEYBALL_MODEL == 44
     output->h = clip2int8(-x);
