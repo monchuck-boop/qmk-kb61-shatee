@@ -13,8 +13,8 @@ AUDIO_ENABLE = no           # Audio output
 CUSTOM_MATRIX = lite
 SRC += lib/duplexmatrix/duplexmatrix.c
 
-# Wait for key to stabilize before reporting (true debounce; avoids eager false presses)
-DEBOUNCE_TYPE = sym_defer_pk
+# Press is immediate (keeps fast rolls like "out" in order); release waits to settle
+DEBOUNCE_TYPE = asym_eager_defer_pk
 
 # Split keyboard.
 SERIAL_DRIVER = vendor

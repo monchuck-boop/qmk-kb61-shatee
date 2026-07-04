@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MATRIX_ROW_PINS     { GP4, GP5, GP6, GP7, GP8 }
 #define MATRIX_COL_PINS     { GP29, GP28, GP27, GP26 }
 #define MATRIX_MASKED
-#define DEBOUNCE            20
+#define DEBOUNCE            15
 
 // Settle time between duplex scan directions (O→I / U→O crosstalk)
 #define DUPLEX_MATRIX_SETTLE_US 100
