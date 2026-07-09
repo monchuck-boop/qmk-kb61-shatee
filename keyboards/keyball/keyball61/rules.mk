@@ -13,7 +13,8 @@ AUDIO_ENABLE = no           # Audio output
 CUSTOM_MATRIX = lite
 SRC += lib/duplexmatrix/duplexmatrix.c
 
-# Press is immediate (keeps fast rolls like "out" in order); release waits to settle
+# Press is immediate after duplex press-stable filter; release waits to settle.
+# asym_eager_defer_pk keeps fast rolls like "out"/"tou" in order (sym_defer_pk caused "otu").
 DEBOUNCE_TYPE = asym_eager_defer_pk
 
 # Split keyboard.

@@ -13,7 +13,10 @@ RP2040 native config (holykeebs keyball61 compatible)
 #define MATRIX_ROW_PINS { GP4, GP5, GP6, GP7, GP8 }
 #define MATRIX_COL_PINS { GP29, GP28, GP27, GP26 }
 #define MATRIX_MASKED
-#define DEBOUNCE    5
+#define DEBOUNCE 10
+
+#define DUPLEX_MATRIX_SETTLE_US 150
+#define DUPLEX_MATRIX_PRESS_STABLE 2
 
 // Split (holykeebs keyball61/config.h)
 #define SERIAL_USART_TX_PIN GP1

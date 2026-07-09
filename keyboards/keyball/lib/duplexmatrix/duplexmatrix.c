@@ -61,6 +61,32 @@ __attribute__((weak)) void duplex_scan_raw_post_kb(matrix_row_t out_matrix[]) {}
 #    define DUPLEX_MATRIX_SETTLE_US 100
 #endif
 
+// Require N consecutive raw reads before accepting a press. 1-scan ghosts from
+// opposite-phase crosstalk (e.g. O press leaking into U) are dropped here.
+#ifndef DUPLEX_MATRIX_PRESS_STABLE
+#    define DUPLEX_MATRIX_PRESS_STABLE 1
+#endif
+
+#if DUPLEX_MATRIX_PRESS_STABLE > 1
+static matrix_row_t duplex_last_raw[PINNUM_ROW];
+static matrix_row_t duplex_filtered[PINNUM_ROW];
+
+static void duplex_filter_press_stable(matrix_row_t out_matrix[]) {
+    for (uint8_t row = 0; row < PINNUM_ROW; row++) {
+        matrix_row_t raw = out_matrix[row];
+
+        matrix_row_t stable_high = raw;
+        for (uint8_t n = 1; n < DUPLEX_MATRIX_PRESS_STABLE; n++) {
+            stable_high &= duplex_last_raw[row];
+        }
+
+        duplex_filtered[row] = (duplex_filtered[row] | stable_high) & raw;
+        duplex_last_raw[row]    = raw;
+        out_matrix[row]         = duplex_filtered[row];
+    }
+}
+#endif
+
 static void duplex_scan_raw(matrix_row_t out_matrix[]) {
     // Phase A: drive rows, read cols (matrix bits 0-3)
     for (uint8_t row = 0; row < PINNUM_ROW; row++) {
@@ -98,6 +124,9 @@ static void duplex_scan_raw(matrix_row_t out_matrix[]) {
         matrix_output_unselect_delay(col, key_pressed);
     }
 
+#if DUPLEX_MATRIX_PRESS_STABLE > 1
+    duplex_filter_press_stable(out_matrix);
+#endif
     duplex_scan_raw_post_kb(out_matrix);
 }
 
