@@ -211,42 +211,32 @@ static void layer_rgb_update(layer_state_t state) {
 }
 #endif
 
-// Scroll: boost light moves, compress fast moves per report, emit as soon as
-// enough distance accumulates (no time throttle — keeps response snappy).
+// Scroll: linear proportion to ball displacement (like cursor movement).
+// Wheel HID is discrete, but motion→ticks mapping stays linear so speed
+// feels consistent; accumulator keeps sub-tick precision across reports.
 static int8_t clip2int8(int16_t v) {
     return (v) < -127 ? -127 : (v) > 127 ? 127 : (int8_t)v;
 }
 
-static int16_t scroll_shape_delta(int16_t delta) {
-    int16_t a = delta < 0 ? -delta : delta;
-    if (a == 0) {
+static int16_t scroll_consume_axis(int16_t *acc, int16_t delta) {
+    if (delta == 0) {
         return 0;
     }
-    // Fast path: any report at/above LIGHT_MAX is always INPUT_MAX.
-    // Light path: bonus is largest for the smallest deltas and falls to 0 at
-    // LIGHT_MAX, so raising LIGHT_GAIN never speeds up fast moves.
-    //   out = a + (LIGHT_MAX - a) * LIGHT_GAIN / LIGHT_MAX   (a < LIGHT_MAX)
-    int16_t out;
-    if (a >= KEYBALL_SCROLL_LIGHT_MAX) {
-        out = KEYBALL_SCROLL_INPUT_MAX;
-    } else {
-        out = a + (int16_t)(KEYBALL_SCROLL_LIGHT_MAX - a) * KEYBALL_SCROLL_LIGHT_GAIN / KEYBALL_SCROLL_LIGHT_MAX;
-    }
-    return delta < 0 ? -out : out;
-}
 
-static int16_t scroll_consume_axis(int16_t *acc, int16_t delta) {
-    *acc += scroll_shape_delta(delta);
-
-    const int16_t acc_max = (int16_t)KEYBALL_SCROLL_LAYER_SPEED * KEYBALL_SCROLL_MAX_TICK;
-    if (*acc > acc_max) {
-        *acc = acc_max;
-    } else if (*acc < -acc_max) {
-        *acc = -acc_max;
-    }
+    *acc += delta;
 
     int16_t ticks = *acc / KEYBALL_SCROLL_LAYER_SPEED;
     *acc -= ticks * KEYBALL_SCROLL_LAYER_SPEED;
+
+#if KEYBALL_SCROLL_MAX_TICK > 0
+    if (ticks > KEYBALL_SCROLL_MAX_TICK) {
+        *acc += (ticks - KEYBALL_SCROLL_MAX_TICK) * KEYBALL_SCROLL_LAYER_SPEED;
+        ticks = KEYBALL_SCROLL_MAX_TICK;
+    } else if (ticks < -KEYBALL_SCROLL_MAX_TICK) {
+        *acc += (ticks + KEYBALL_SCROLL_MAX_TICK) * KEYBALL_SCROLL_LAYER_SPEED;
+        ticks = -KEYBALL_SCROLL_MAX_TICK;
+    }
+#endif
     return ticks;
 }
 
