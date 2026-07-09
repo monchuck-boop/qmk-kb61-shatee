@@ -108,18 +108,10 @@ static bool is_mouse_nav_key(keypos_t key) {
     }
 }
 
-// Right-hand , (comma): hold = scroll, tap = ","
-// Works before mouse mode (no need to enter layer 3 first)
-static bool is_scroll_mod_key(keypos_t key) {
-    return key.row == 8 && key.col == 4;
-}
+static int16_t scroll_speed_h = 0;
+static int16_t scroll_speed_v = 0;
 
-static bool     scroll_mod_held  = false;
-static uint16_t scroll_mod_timer = 0;
-static int16_t  scroll_speed_h   = 0;
-static int16_t  scroll_speed_v   = 0;
-
-// LT1 / LT2 / , 長押し中は Auto Mouse を解除し、離すまで再発動しない
+// LT1 / LT2 長押し中は Auto Mouse を解除し、離すまで再発動しない
 static uint8_t am_suppress_count = 0;
 
 static void am_suppress_on(void) {
@@ -143,8 +135,8 @@ static void am_suppress_off(void) {
 }
 
 static void update_scroll_mode(layer_state_t state) {
-    // LT1 または , 押しっぱなしでスクロール（マウスレイヤー不要）
-    bool want_scroll = layer_state_cmp(state, 1) || scroll_mod_held;
+    // LT1 押しっぱなしでスクロール（マウスレイヤー不要）
+    bool want_scroll = layer_state_cmp(state, 1);
     if (want_scroll) {
         keyball_set_scroll_mode(true);
     } else {
@@ -158,7 +150,6 @@ static void update_scroll_mode(layer_state_t state) {
 
 bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     // Auto Mouse 中だけ H/J/K/L/; をマウスキー扱い（通常入力時は文字として送る）
-    // , は process_record_user でスクロール修飾として処理（マウスレイヤー不要）
     if (is_auto_mouse_active() && is_mouse_nav_key(record->event.key)) {
         return true;
     }
@@ -174,25 +165,6 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    // , : 押しっぱなしでスクロール、タップで ","
-    if (is_scroll_mod_key(record->event.key)) {
-        if (record->event.pressed) {
-            scroll_mod_held  = true;
-            scroll_mod_timer = timer_read();
-            am_suppress_on();
-            update_scroll_mode(layer_state);
-        } else {
-            bool was_tap = timer_elapsed(scroll_mod_timer) < TAPPING_TERM;
-            scroll_mod_held = false;
-            am_suppress_off();
-            update_scroll_mode(layer_state);
-            if (was_tap) {
-                tap_code(KC_COMM);
-            }
-        }
-        return false;
-    }
-
     if (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) {
         uint8_t layer = QK_LAYER_TAP_GET_LAYER(keycode);
         if ((layer == 1 || layer == 2) && record->tap.count == 0) {
@@ -300,7 +272,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
         state = remove_auto_mouse_layer(state, true);
     }
 
-    // スクロール: LT1、またはマウスレイヤー中の , 押しっぱなし
+    // スクロール: LT1 押しっぱなし
     update_scroll_mode(state);
 #ifdef RGBLIGHT_ENABLE
     layer_rgb_update(state);
