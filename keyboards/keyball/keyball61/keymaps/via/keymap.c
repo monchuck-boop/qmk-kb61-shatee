@@ -165,6 +165,22 @@ bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Same-key refractory: first press is immediate; a second press of the
+    // same matrix position within KEYBALL_SAME_KEY_MIN_INTERVAL is dropped.
+    // Catches duplex ghosts (O→U → ouu) without delaying the initial key.
+    if (record->event.pressed) {
+        static uint16_t last_press_time[MATRIX_ROWS][MATRIX_COLS];
+        uint8_t row = record->event.key.row;
+        uint8_t col = record->event.key.col;
+        if (row < MATRIX_ROWS && col < MATRIX_COLS) {
+            uint16_t last = last_press_time[row][col];
+            if (last != 0 && timer_elapsed(last) < KEYBALL_SAME_KEY_MIN_INTERVAL) {
+                return false;
+            }
+            last_press_time[row][col] = timer_read();
+        }
+    }
+
     if (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) {
         uint8_t layer = QK_LAYER_TAP_GET_LAYER(keycode);
         if ((layer == 1 || layer == 2) && record->tap.count == 0) {

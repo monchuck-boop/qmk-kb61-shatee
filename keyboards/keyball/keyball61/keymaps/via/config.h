@@ -16,6 +16,10 @@ Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
 
 #define TAP_CODE_DELAY 5
 
+// Ignore re-press of the same physical key within this window (ms).
+// First press stays immediate; blocks ghost→real doubles like O→U → "ouu".
+#define KEYBALL_SAME_KEY_MIN_INTERVAL 100
+
 // Scroll tuning (linear, proportional to ball displacement):
 //   SPEED    - motion units per wheel tick (higher = slower scroll)
 //   MAX_TICK - max ticks per USB report (0 = unlimited; burst on fast flicks)

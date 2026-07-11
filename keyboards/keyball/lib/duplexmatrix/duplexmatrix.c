@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "quantum.h"
 #include "matrix.h"
 #include "debounce.h"
+#include "timer.h"
 
 #ifdef SPLIT_KEYBOARD
 #    include "split_common/split_util.h"
@@ -61,28 +62,47 @@ __attribute__((weak)) void duplex_scan_raw_post_kb(matrix_row_t out_matrix[]) {}
 #    define DUPLEX_MATRIX_SETTLE_US 100
 #endif
 
-// Require N consecutive raw reads before accepting a press. 1-scan ghosts from
-// opposite-phase crosstalk (e.g. O press leaking into U) are dropped here.
-#ifndef DUPLEX_MATRIX_PRESS_STABLE
-#    define DUPLEX_MATRIX_PRESS_STABLE 1
+// After a *stable* key release, ignore NEW opposite-phase keys on the same row.
+// Only keys held across 2+ scans arm this — 1-scan ghosts must not arm inhibit
+// (that previously blocked real keys and caused "out"→"otu" / "tou").
+#ifndef DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS
+#    define DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS 0
 #endif
 
-#if DUPLEX_MATRIX_PRESS_STABLE > 1
-static matrix_row_t duplex_last_raw[PINNUM_ROW];
-static matrix_row_t duplex_filtered[PINNUM_ROW];
+#define DUPLEX_PHASE_A_MASK (((matrix_row_t)1 << PINNUM_COL) - 1)
+#define DUPLEX_PHASE_B_MASK (DUPLEX_PHASE_A_MASK << PINNUM_COL)
 
-static void duplex_filter_press_stable(matrix_row_t out_matrix[]) {
+#if DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS > 0
+static matrix_row_t duplex_prev[PINNUM_ROW];
+static matrix_row_t duplex_stable[PINNUM_ROW];
+static matrix_row_t duplex_inhibit_mask[PINNUM_ROW];
+static uint16_t     duplex_inhibit_start[PINNUM_ROW];
+
+static void duplex_filter_opposite_inhibit(matrix_row_t out_matrix[]) {
     for (uint8_t row = 0; row < PINNUM_ROW; row++) {
-        matrix_row_t raw = out_matrix[row];
+        matrix_row_t raw           = out_matrix[row];
+        matrix_row_t released_stable = duplex_stable[row] & ~raw;
+        matrix_row_t result          = raw;
 
-        matrix_row_t stable_high = raw;
-        for (uint8_t n = 1; n < DUPLEX_MATRIX_PRESS_STABLE; n++) {
-            stable_high &= duplex_last_raw[row];
+        // Arm only when a key that was held for 2+ scans releases.
+        if (released_stable & DUPLEX_PHASE_A_MASK) {
+            duplex_inhibit_mask[row]  = DUPLEX_PHASE_B_MASK;
+            duplex_inhibit_start[row] = timer_read();
+        } else if (released_stable & DUPLEX_PHASE_B_MASK) {
+            duplex_inhibit_mask[row]  = DUPLEX_PHASE_A_MASK;
+            duplex_inhibit_start[row] = timer_read();
         }
 
-        duplex_filtered[row] = (duplex_filtered[row] | stable_high) & raw;
-        duplex_last_raw[row]    = raw;
-        out_matrix[row]         = duplex_filtered[row];
+        if (duplex_inhibit_mask[row] != 0 && timer_elapsed(duplex_inhibit_start[row]) < DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS) {
+            // Keep already-held opposite keys; drop only new ones (release ghosts).
+            result &= ~(duplex_inhibit_mask[row] & ~duplex_prev[row]);
+        } else {
+            duplex_inhibit_mask[row] = 0;
+        }
+
+        duplex_stable[row] = duplex_prev[row] & result;
+        duplex_prev[row]   = result;
+        out_matrix[row]    = result;
     }
 }
 #endif
@@ -124,8 +144,8 @@ static void duplex_scan_raw(matrix_row_t out_matrix[]) {
         matrix_output_unselect_delay(col, key_pressed);
     }
 
-#if DUPLEX_MATRIX_PRESS_STABLE > 1
-    duplex_filter_press_stable(out_matrix);
+#if DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS > 0
+    duplex_filter_opposite_inhibit(out_matrix);
 #endif
     duplex_scan_raw_post_kb(out_matrix);
 }

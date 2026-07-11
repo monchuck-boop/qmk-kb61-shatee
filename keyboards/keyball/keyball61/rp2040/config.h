@@ -15,8 +15,8 @@ RP2040 native config (holykeebs keyball61 compatible)
 #define MATRIX_MASKED
 #define DEBOUNCE 10
 
-#define DUPLEX_MATRIX_SETTLE_US 150
-#define DUPLEX_MATRIX_PRESS_STABLE 2
+#define DUPLEX_MATRIX_SETTLE_US 250
+#define DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS 20
 
 // Split (holykeebs keyball61/config.h)
 #define SERIAL_USART_TX_PIN GP1

@@ -27,9 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define DEBOUNCE            10
 
 // Duplex crosstalk: O/U/I are on opposite scan phases (cols 0-3 vs 4-7).
-// Settle reduces ghost generation; press-stable drops 1-scan ghosts before debounce.
-#define DUPLEX_MATRIX_SETTLE_US   150
-#define DUPLEX_MATRIX_PRESS_STABLE  2
+// Inhibit only after a stable (2+ scan) release — 1-scan ghosts must not arm it.
+// Same-key min-interval merges press-edge ghost+real doubles; first press is eager.
+#define DUPLEX_MATRIX_SETTLE_US            250
+#define DUPLEX_MATRIX_OPPOSITE_INHIBIT_MS   20
 
 // Split parameters
 #define SERIAL_USART_TX_PIN GP1
