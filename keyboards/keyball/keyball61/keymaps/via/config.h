@@ -24,7 +24,7 @@ Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
 //   SPEED    - motion units per wheel tick (higher = slower scroll)
 //   MAX_TICK - max ticks per USB report (0 = unlimited; burst on fast flicks)
 #define KEYBALL_SCROLL_LAYER_SPEED 24
-#define KEYBALL_SCROLL_MAX_TICK    8
+#define KEYBALL_SCROLL_MAX_TICK    0
 
 #define DYNAMIC_KEYMAP_LAYER_COUNT 8
 
