@@ -18,19 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include QMK_KEYBOARD_H
 
-#include "pointing_device_auto_mouse.h"
 #include "quantum.h"
 
 // clang-format off
 // Layers 0-2: keyball61_20260704.vil
-// Layer 3: Auto Mouse (trackball movement, H/J/K/L/; = mouse buttons)
+// Layer 3: Mouse (hold MO(3) on bottom-right thumb)
+//   H/J = BTN4/1, I/O/P = BTN3/2/5, K = scroll while held
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_universal(
     KC_ESC   , KC_1     , KC_2     , KC_3     , KC_4     , KC_5     ,                                  KC_6     , KC_7     , KC_8     , KC_9     , KC_0     , KC_BSPC  ,
     KC_TAB   , KC_Q     , KC_W     , KC_E     , KC_R     , KC_T     ,                                  KC_Y     , KC_U     , KC_I     , KC_O     , KC_P     , KC_MINS  ,
     KC_LCTL  , KC_A     , KC_S     , KC_D     , KC_F     , KC_G     ,                                  KC_H     , KC_J     , KC_K     , KC_L     , KC_SCLN  , KC_QUOT  ,
-    KC_LSFT  , KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     , KC_LNG2  ,              KC_LNG1  , KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  , KC_INT1  ,
-    _______  , KC_LCTL  , KC_LALT  , KC_LALT  , KC_LGUI  , LT(1,KC_LNG2), KC_SPC ,            KC_ENT   , LT(2,KC_LNG1), KC_NO , KC_NO    , KC_NO    , KC_NO    , KC_NO
+    KC_LSFT  , KC_Z     , KC_X     , KC_C     , KC_V     , KC_B     , KC_LNG2  ,            KC_LNG1  , KC_N     , KC_M     , KC_COMM  , KC_DOT   , KC_SLSH  , KC_INT1  ,
+    _______  , KC_LCTL  , KC_LALT  , KC_LALT  , KC_LGUI  , LT(1,KC_LNG2), KC_SPC   ,        KC_ENT   , LT(2,KC_LNG1), KC_NO    , KC_NO    , KC_NO    , KC_NO    , MO(3)
   ),
 
   [1] = LAYOUT_universal(
@@ -51,8 +51,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
   [3] = LAYOUT_universal(
     _______  , _______  , _______  , _______  , _______  , _______  ,                                  _______  , _______  , _______  , _______  , _______  , _______  ,
-    _______  , _______  , _______  , _______  , _______  , _______  ,                                  _______  , _______  , _______  , _______  , _______  , _______  ,
-    _______  , _______  , _______  , _______  , _______  , _______  ,                                  KC_BTN4  , KC_BTN1  , KC_BTN3  , KC_BTN2  , KC_BTN5  , _______  ,
+    _______  , _______  , _______  , _______  , _______  , _______  ,                                  _______  , _______  , KC_BTN3  , KC_BTN2  , KC_BTN5  , _______  ,
+    _______  , _______  , _______  , _______  , _______  , _______  ,                                  KC_BTN4  , KC_BTN1  , SCRL_MO  , _______  , _______  , _______  ,
     _______  , _______  , _______  , _______  , _______  , _______  , _______  ,            _______  , _______  , _______  , _______  , _______  , _______  , _______  ,
     _______  , _______  , _______  , _______  , _______  , _______  , _______  ,            _______  , _______  , KC_NO    , KC_NO    , KC_NO    , _______  , _______
   ),
@@ -91,52 +91,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 // clang-format on
 
-// Right-hand home row physical positions: H J K L ;
-static bool is_mouse_nav_key(keypos_t key) {
-    if (key.row != 7) {
-        return false;
-    }
-    switch (key.col) {
-        case 1: // ;
-        case 2: // L
-        case 4: // K
-        case 5: // J
-        case 6: // H
-            return true;
-        default:
-            return false;
-    }
-}
-
 static int16_t scroll_speed_h = 0;
 static int16_t scroll_speed_v = 0;
-
-// LT1 / LT2 長押し中は Auto Mouse を解除し、離すまで再発動しない
-static uint8_t am_suppress_count = 0;
-
-static void am_suppress_on(void) {
-    if (am_suppress_count == 0) {
-        set_auto_mouse_enable(false);
-    }
-    am_suppress_count++;
-    if (layer_state_is(3)) {
-        layer_off(3);
-    }
-}
-
-static void am_suppress_off(void) {
-    if (am_suppress_count == 0) {
-        return;
-    }
-    am_suppress_count--;
-    if (am_suppress_count == 0) {
-        set_auto_mouse_enable(true);
-    }
-}
+static bool    scroll_mod_held = false;
 
 static void update_scroll_mode(layer_state_t state) {
-    // LT1 押しっぱなしでスクロール（マウスレイヤー不要）
-    bool want_scroll = layer_state_cmp(state, 1);
+    // LT1 押しっぱなし、または Layer3 の K (SCRL_MO) 押しっぱなしでスクロール
+    bool want_scroll = layer_state_cmp(state, 1) || scroll_mod_held;
     if (want_scroll) {
         keyball_set_scroll_mode(true);
     } else {
@@ -146,22 +107,6 @@ static void update_scroll_mode(layer_state_t state) {
         }
         keyball_set_scroll_mode(false);
     }
-}
-
-bool is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
-    // Auto Mouse 中だけ H/J/K/L/; をマウスキー扱い（通常入力時は文字として送る）
-    if (is_auto_mouse_active() && is_mouse_nav_key(record->event.key)) {
-        return true;
-    }
-    if (IS_MOUSEKEY(keycode)) {
-        return true;
-    }
-    switch (keycode) {
-        case KC_MS_BTN1 ... KC_MS_BTN8:
-        case KC_WH_U ... KC_WH_R:
-            return true;
-    }
-    return false;
 }
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -181,21 +126,16 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         }
     }
 
-    if (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX) {
-        uint8_t layer = QK_LAYER_TAP_GET_LAYER(keycode);
-        if ((layer == 1 || layer == 2) && record->tap.count == 0) {
-            if (record->event.pressed) {
-                am_suppress_on();
-            } else {
-                am_suppress_off();
-            }
-        }
+    switch (keycode) {
+        case SCRL_MO:
+            scroll_mod_held = record->event.pressed;
+            update_scroll_mode(layer_state);
+            break;
     }
     return true;
 }
 
 void keyboard_post_init_user(void) {
-    set_auto_mouse_enable(true);
     keyball_set_scrollsnap_mode(KEYBALL_SCROLLSNAP_MODE_FREE);
 #ifdef RGBLIGHT_ENABLE
     rgblight_enable_noeeprom();
@@ -273,12 +213,7 @@ void keyball_on_apply_motion_to_mouse_scroll(report_mouse_t *report, report_mous
 }
 
 layer_state_t layer_state_set_user(layer_state_t state) {
-    // LT1 / LT2 中はマウスレイヤーを解除する
-    if (layer_state_cmp(state, 1) || layer_state_cmp(state, 2)) {
-        state = remove_auto_mouse_layer(state, true);
-    }
-
-    // スクロール: LT1 押しっぱなし
+    // スクロール: LT1 / SCRL_MO 押しっぱなし
     update_scroll_mode(state);
 #ifdef RGBLIGHT_ENABLE
     layer_rgb_update(state);
