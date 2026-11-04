@@ -27,7 +27,7 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 【回路修正】回路の初期化は残し、トラックボールのエラー原因だけを消去
+      # 4. 【完全自動修復】汚れたファイルをリセットし、エラーの原因行だけをピンポイント消去
       - name: Force Rewrite for Pure Keyboard Matrix
         run: |
           CONFIG_FILE="keyboards/keyball/keyball61/config.h"
@@ -35,17 +35,32 @@ jobs:
           KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
           KEYBALL_C="keyboards/keyball/lib/keyball/keyball.c"
           
+          # 【最重要】前回のトラブルで汚れてしまった可能性のある keyball61.c を自動リセット
+          if [ -f "keyboards/keyball/keyball61/keyball61.c" ]; then
+            echo "==== Resetting keyball61.c ===="
+            echo '#include "keyball61.h"' > keyboards/keyball/keyball61/keyball61.c
+          fi
+          
+          # 【最重要】今回エラーを吐いている共通ファイルから、トラックボール関連の行だけをピンポイント消去
+          # これによりマトリックス初期化（キーのエンジン）だけが綺麗に残ります
+          if [ -f "$KEYBALL_C" ]; then
+            echo "==== Patching keyball.c (Removing pmw33xx & pointing device codes) ===="
+            sed -i '/pmw33xx/d' "$KEYBALL_C"
+            sed -i '/pointing_device/d' "$KEYBALL_C"
+            sed -i '/keyball_set_scroll_mode/d' "$KEYBALL_C"
+            sed -i 's/#include "pmw33xx_common.h"/\/\/ #include "pmw33xx_common.h"/g' "$KEYBALL_C"
+          fi
+          
           # A. config.h の設定（右手を主役にし、左手との通信を完全遮断）
           if [ -f "$CONFIG_FILE" ]; then
-            echo "Configuring config.h..."
             echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
             echo "#define SPLIT_USB_DETECT" >> "$CONFIG_FILE"
             echo "#define FORWARD_EECONFIG" >> "$CONFIG_FILE"
+            echo "#define NO_TRACKBALL" >> "$CONFIG_FILE"
           fi
           
           # B. rules.mk の設定（RP2040への切り替えと、エラーの原因をオフ）
           if [ -f "$RULES_FILE" ]; then
-            echo "Configuring rules.mk..."
             sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
             sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
             
@@ -56,18 +71,8 @@ jobs:
             sed -i 's/VIA_ENABLE =.*/VIA_ENABLE = no/g' "$RULES_FILE"
           fi
           
-          # C. 【重要】keyball.c からトラックボールのエラーを吐く行（pmw33xxなど）だけをピンポイントで消去
-          # キー回路の初期化（duplexmatrix_init）は絶対に消さずに残します
-          if [ -f "$KEYBALL_C" ]; then
-            echo "Removing pointing device codes from keyball.c but keeping matrix init..."
-            sed -i '/pmw33xx/d' "$KEYBALL_C"
-            sed -i '/pointing_device/d' "$KEYBALL_C"
-            sed -i '/keyball_set_scroll_mode/d' "$KEYBALL_C"
-          fi
-          
-          # D. keymap.c 内のトラックボール命令をコメントアウト
+          # C. keymap.c 内のトラックボール関連命令を無効化
           if [ -f "$KEYMAP_FILE" ]; then
-            echo "Patching keymap.c to remove keyball_set_scroll_mode..."
             sed -i 's/keyball_set_scroll_mode/\/\/ keyball_set_scroll_mode/g' "$KEYMAP_FILE"
           fi
 
