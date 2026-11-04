@@ -1,0 +1,55 @@
+name: Build Keyball61 RP2040
+
+on:
+  workflow_dispatch: # 手動実行用
+  push:
+    branches:
+      - keyball61-rp2040
+    paths:
+      - 'keyboards/keyball/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04 # 安定したPython 3.10環境が含まれるUbuntu
+
+    steps:
+      # 1. リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 2. 必要なPythonバージョン(3.10)を明示的にセットアップ
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. QMK CLIと依存関係のインストール
+      - name: Install QMK CLI and dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install qmk
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+
+      # 4. QMK環境の初期化
+      - name: Setup QMK Environment
+        run: |
+          qmk setup -y
+
+      # 5. Keyball61 (RP2040) のコンパイル
+      - name: Compile Keyball61
+        run: |
+          qmk compile -kb keyball/keyball61 -km default
+
+      # 6. コンパイルされたファームウェア (.uf2) を保存
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyball61-rp2040-firmware
+          path: |
+            *.uf2
+            *.hex
+            *.bin
+          if-no-files-found: error
