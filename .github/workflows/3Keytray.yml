@@ -1,4 +1,4 @@
-name: Fix Keyball61 Right Thumb Only (RP2040)　3key
+name: Fix Keyball61 Right Thumb Only (RP2040)
 
 on:
   workflow_dispatch: # 手動実行用
@@ -27,7 +27,7 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 【親指最優先設定】右手を完全に主役にし、左手への通信待ちを100%遮断する
+      # 4. 【親指最優先設定】右手をマスターにし、センサーコードのエラーを回避
       - name: Force Configure Right Hand Master Single Mode
         run: |
           CONFIG_FILE="keyboards/keyball/keyball61/config.h"
@@ -35,29 +35,27 @@ jobs:
           
           if [ -f "$CONFIG_FILE" ]; then
             echo "==== config.h に右手単独用の定義を追加 ===="
-            # 右手をマスター（主役）にする
             echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
-            # 起動時に相方がいなくても即座に単独マトリックスモードを有効化
             echo "#define SPLIT_USB_DETECT" >> "$CONFIG_FILE"
-            # 通信によるフリーズを徹底的に防止
             echo "#define FORWARD_EECONFIG" >> "$CONFIG_FILE"
           fi
           
           if [ -f "$RULES_FILE" ]; then
             echo "==== rules.mk のマイコンをRP2040に切り替え ===="
-            # マイコンの指定を元の ProMicro から RP2040 へ上書き変更
             sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
             sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
             
-            # 分割通信機能を完全にオフ（これによって右手単独マトリックスが強制発動します）
+            # 分割通信機能を完全にオフ（右手単独マトリックスの強制発動）
             if grep -q "SPLIT_KEYBOARD_ENABLE" "$RULES_FILE"; then
               sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' "$RULES_FILE"
             else
               echo "SPLIT_KEYBOARD_ENABLE = no" >> "$RULES_FILE"
             fi
             
-            # トラックボールのエラーでビルドが止まるのを防ぐため、一旦無効化
-            sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = no/g' "$RULES_FILE"
+            # pointing_device.h のエラーを防ぐため、デバイス自体は YES に戻す
+            sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = yes/g' "$RULES_FILE"
+            
+            # 壊れた PMW3360 の固有コードだけを確実にオフにする
             sed -i 's/PMW3360_ENABLE =.*/PMW3360_ENABLE = no/g' "$RULES_FILE"
           fi
 
@@ -72,4 +70,5 @@ jobs:
           name: keyball61-rp2040-thumb-only
           path: |
             *.uf2
+            .build/*.uf2
           if-no-files-found: error
