@@ -27,21 +27,20 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 右手単独環境の定義 ＆ 【超重要】エラーの根源である共通ファイルを Actions 内で完全強制リセット
-      - name: Configure Right Hand Master Single Mode
+      # 4. 【超重要】汚れてしまった全C言語ファイルをビルド直前に正しいコードで完全強制リセット
+      - name: Force Reset Corrupted C Files and Configure Right Master
         run: |
           CONFIG_FILE="keyboards/keyball/keyball61/config.h"
           RULES_FILE="keyboards/keyball/keyball61/rules.mk"
-          TARGET_C="keyboards/keyball/keyball61/keyball61.c"
+          KEYBOARD_C="keyboards/keyball/keyball61/keyball61.c"
+          KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
           COMMON_KEYBALL_C="keyboards/keyball/lib/keyball/keyball.c"
           
-          # A. 汚れていた keyball61.c を確実に初期化
-          echo "==== Resetting keyball61.c ===="
-          echo '#include "keyball61.h"' > "$TARGET_C"
+          echo "==== [1/3] 汚れた keyball61.c を強制リセット ===="
+          echo '#include "keyball61.h"' > "$KEYBOARD_C"
           
-          # B. 【一撃必殺】エラーの原因である共通の keyball.c の中身を、ビルドを邪魔しない最低限の空関数に強制書き換え
+          echo "==== [2/3] 共通ライブラリの keyball.c のエラーを強制バイパス ===="
           if [ -f "$COMMON_KEYBALL_C" ]; then
-            echo "==== Bypassing common keyball.c errors by force reset ===="
             echo '#include "quantum.h"' > "$COMMON_KEYBALL_C"
             echo 'void keyboard_pre_init_kb(void) { keyboard_pre_init_user(); }' >> "$COMMON_KEYBALL_C"
             echo 'void keyboard_post_init_kb(void) { keyboard_post_init_user(); }' >> "$COMMON_KEYBALL_C"
@@ -50,7 +49,27 @@ jobs:
             echo 'bool process_record_kb(uint16_t keycode, keyrecord_t *record) { return process_record_user(keycode, record); }' >> "$COMMON_KEYBALL_C"
           fi
           
-          # C. config.h の設定（右手を主役にし、左手との通信を完全遮断 ＆ トラックボール不要マクロ）
+          echo "==== [3/3] YAMLが誤爆した keymap.c を純正のデフォルトキーマップで完全強制上書き ===="
+          mkdir -p keyboards/keyball/keyball61/keymaps/default
+          cat << 'EOF' > "$KEYMAP_FILE"
+#include QMK_KEYBOARD_H
+
+const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
+    [0] = LAYOUT_aesop(
+        KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,                      KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_BSPC,
+        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                      KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_MINS,
+        KC_LCTL, KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                      KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,
+        KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_LBRC, KC_RBRC, KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_ENT,
+                                   KC_LGUI, KC_LALT, KC_SPC,                    KC_SPC,  KC_RALT, KC_RGUI
+    )
+};
+
+void keyboard_post_init_user(void) {
+    // トラックボール関連の初期化エラーを完全に防ぐ空の関数
+}
+EOF
+
+          echo "==== [4/4] config.h と rules.mk を右手単独・RP2040用に強制書き換え ===="
           if [ -f "$CONFIG_FILE" ]; then
             echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
             echo "#define SPLIT_USB_DETECT" >> "$CONFIG_FILE"
@@ -58,7 +77,6 @@ jobs:
             echo "#define NO_TRACKBALL" >> "$CONFIG_FILE"
           fi
           
-          # D. rules.mk の設定（RP2040への切り替えと、エラーの原因をオフ）
           if [ -f "$RULES_FILE" ]; then
             sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
             sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
