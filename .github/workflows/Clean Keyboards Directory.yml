@@ -3,12 +3,16 @@ name: Clean Keyboards Directory
 on:
   workflow_dispatch: # 手動実行用
 
+# GitHub Actionsに書き込み権限を明示的に付与
+permissions:
+  contents: write
+
 jobs:
   clean-up:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. リポジトリをチェックアウト（全履歴ではなく最新状態のみ）
+      # 1. リポジトリをチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
