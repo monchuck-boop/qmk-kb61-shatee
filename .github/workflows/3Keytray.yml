@@ -27,11 +27,12 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 【最強の強制設定】エラーが出るソースファイルを切り離し、右手単独キーボードとして再定義
+      # 4. 【完全遮断】エラーの原因となる関数呼び出しやソースをすべて無効化・書き換え
       - name: Force Rewrite for Pure Keyboard Matrix
         run: |
           CONFIG_FILE="keyboards/keyball/keyball61/config.h"
           RULES_FILE="keyboards/keyball/keyball61/rules.mk"
+          KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
           
           # A. config.h の設定（右手をマスター（主役）にし、通信を一切無視）
           if [ -f "$CONFIG_FILE" ]; then
@@ -41,24 +42,23 @@ jobs:
             echo "#define FORWARD_EECONFIG" >> "$CONFIG_FILE"
           fi
           
-          # B. rules.mk の設定（RP2040に切り替え、余計な機能やエラーの元を完全オフ）
+          # B. rules.mk の設定（RP2040に切り替え、トラックボールやエラーの元を完全オフ）
           if [ -f "$RULES_FILE" ]; then
             echo "Configuring rules.mk..."
             sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
             sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
             
-            # 分割機能、ポインティング機能、RGB等のエラーの引き金になる機能をすべて完全無効化
             sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' "$RULES_FILE"
             sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = no/g' "$RULES_FILE"
             sed -i 's/PMW3360_ENABLE =.*/PMW3360_ENABLE = no/g' "$RULES_FILE"
             sed -i 's/RGBLIGHT_ENABLE =.*/RGBLIGHT_ENABLE = no/g' "$RULES_FILE"
             sed -i 's/VIA_ENABLE =.*/VIA_ENABLE = no/g' "$RULES_FILE"
             
-            # ビルドエラーの原因になる keyball.c などの共通ライブラリを読み込ませないための処理
+            # ビルドエラーの原因になる共通ライブラリを読み込ませない処理
             sed -i 's/SRC +=.*/# SRC +=/g' "$RULES_FILE"
           fi
           
-          # C. 【重要】エラーの原因である keyball.c の中身を、ビルドを邪魔しない空の関数に置き換える
+          # C. keyball.c の中身を空にする
           KEYBALL_C="keyboards/keyball/lib/keyball/keyball.c"
           if [ -f "$KEYBALL_C" ]; then
             echo "Bypassing keyball.c errors..."
@@ -68,6 +68,13 @@ jobs:
             echo 'void matrix_init_kb(void) { matrix_init_user(); }' >> "$KEYBALL_C"
             echo 'void matrix_scan_kb(void) { matrix_scan_user(); }' >> "$KEYBALL_C"
             echo 'bool process_record_kb(uint16_t keycode, keyrecord_t *record) { return process_record_user(keycode, record); }' >> "$KEYBALL_C"
+          fi
+          
+          # D. 【新設】keymap.c 内のエラーの原因となっている関数呼び出しを完全に無効化（削除）する
+          if [ -f "$KEYMAP_FILE" ]; then
+            echo "Patching keymap.c to remove keyball_set_scroll_mode..."
+            # keyball_set_scroll_mode が含まれる行をコメントアウト、または無効化
+            sed -i 's/keyball_set_scroll_mode/\/\/ keyball_set_scroll_mode/g' "$KEYMAP_FILE"
           fi
 
       # 5. コンパイルの実行
