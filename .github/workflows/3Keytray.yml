@@ -19,20 +19,19 @@ jobs:
 
       - name: Fix QMK CLI & Source Code Internal Python Bug (Deep Search Fix)
         run: |
-          # エラーの原因になっているすべての 'math.py' をシステム内から検索し、一括で強制置換します
           echo "Searching and fixing math.py across the system..."
           find / -name "math.py" -path "*qmk*" 2>/dev/null | while read -r file; do
-            echo "Applying patch to: $file"
             sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$file"
           done
 
-      - name: Configure Hardware (Right Hand & GP17)
+      - name: Configure Hardware (Right Hand & GP17 Fix)
         run: |
           # 右手単独動作のための設定を追加
           echo "#define MASTER_RIGHT" >> keyboards/keyball/keyball61/config.h
           
-          # COL3をGP15からGP17へ変更したピン配列を上書き
-          echo "#define MATRIX_COL_PINS { GP20, GP19, GP18, GP17, GP14, GP13 }" >> keyboards/keyball/keyball61/config.h
+          # config.h 内の既存の MATRIX_COL_PINS 定義を直接書き換える
+          # 元の配列 { GP29, GP28, GP27, GP26 } の最後の GP26 を GP17 に差し替え
+          sed -i 's/{ GP29, GP28, GP27, GP26 }/{ GP29, GP28, GP27, GP17 }/g' keyboards/keyball/keyball61/config.h
 
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
