@@ -10,9 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    # 【修正箇所】確実に存在する過去の安定タグ "1.2.0" を指定
-    container: qmkfm/qmk_cli:1.2.0
+    runs-on: ubuntu-22.04 # 安定したPython 3.10環境が含まれるUbuntuバージョンを指定
 
     steps:
       # 1. リポジトリのチェックアウト
@@ -21,18 +19,32 @@ jobs:
         with:
           submodules: recursive
 
-      # 2. QMK環境のセットアップとクリーン
+      # 2. 必要なPythonバージョン(3.10)を明示的にセットアップ（これでast.Numエラーを完全回避）
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. QMK CLIと依存関係のインストール
+      - name: Install QMK CLI and dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install qmk
+          # Linux用のクロスコンパイル環境（RP2040用）をインストール
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+
+      # 4. QMK環境の初期化
       - name: Setup QMK Environment
         run: |
           qmk setup -y
-          qmk clean
 
-      # 3. Keyball61 (RP2040) のコンパイル
+      # 5. Keyball61 (RP2040) のコンパイル
       - name: Compile Keyball61
         run: |
           qmk compile -kb keyball/keyball61 -km default
 
-      # 4. コンパイルされたファームウェア (.uf2) をArtifactとして保存
+      # 6. コンパイルされたファームウェア (.uf2) をArtifactとして保存
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
