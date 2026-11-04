@@ -1,4 +1,4 @@
-name: Build Keyball61 Right Hand Only
+name: Build Keyball61 Right Hand Only (New Base Fix)
 
 on:
   workflow_dispatch:
@@ -24,13 +24,28 @@ jobs:
             sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$file"
           done
 
-      - name: Configure Hardware (Right Hand & GP17 Fix)
+      - name: Configure Hardware (Right Hand & GP17 Auto-Path Fix)
         run: |
-          # 右手単独動作のための設定を追加
-          echo "#define MASTER_RIGHT" >> keyboards/keyball/keyball61/config.h
+          # リポジトリ内にある 'config.h' の場所を自動検索してパスを特定します
+          CONFIG_PATH=$(find . -name "config.h" -path "*keyball61*" | head -n 1)
           
-          # config.h 内の既存の MATRIX_COL_PINS 定義を直接書き換える
-          sed -i 's/{ GP29, GP28, GP27, GP26 }/{ GP29, GP28, GP27, GP17 }/g' keyboards/keyball/keyball61/config.h
+          # もし見つからなければ、リポジトリ全体から config.h を探します
+          if [ -z "$CONFIG_PATH" ]; then
+            CONFIG_PATH=$(find . -name "config.h" | head -n 1)
+          fi
+          
+          echo "Target config.h found at: $CONFIG_PATH"
+          
+          if [ -n "$CONFIG_PATH" ] && [ -f "$CONFIG_PATH" ]; then
+            # 右手単独動作のための設定を追加
+            echo "#define MASTER_RIGHT" >> "$CONFIG_PATH"
+            
+            # MATRIX_COL_PINS を正常な4本配列ベースの「最後をGP17に変えたもの」に強制置換
+            sed -i 's/#define MATRIX_COL_PINS.*/#define MATRIX_COL_PINS { GP29, GP28, GP27, GP17 }/g' "$CONFIG_PATH"
+          else
+            echo "ERROR: config.h not found in this repository."
+            exit 1
+          fi
 
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
