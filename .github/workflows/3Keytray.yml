@@ -17,16 +17,21 @@ jobs:
       - name: Disable git safe directory checks
         run: git config --global --add safe.directory '*'
 
-      - name: Fix QMK CLI Internal Python Bug & Configure Hardware
+      - name: Fix QMK CLI & Source Code Internal Python Bug (Deep Search Fix)
         run: |
-          SYS_MATH_PY="/usr/local/lib/python3.14/site-packages/qmk/math.py"
-          [ -f "$SYS_MATH_PY" ] && sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$SYS_MATH_PY"
-          
-          # 右手単独動作のための設定
+          # エラーの原因になっているすべての 'math.py' をシステム内から検索し、一括で強制置換します
+          echo "Searching and fixing math.py across the system..."
+          find / -name "math.py" -path "*qmk*" 2>/dev/null | while read -r file; do
+            echo "Applying patch to: $file"
+            sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$file"
+          done
+
+      - name: Configure Hardware (Right Hand & GP17)
+        run: |
+          # 右手単独動作のための設定を追加
           echo "#define MASTER_RIGHT" >> keyboards/keyball/keyball61/config.h
           
-          # COL3をGP15からGP17へ変更（配列の4番目をGP17に書き換え）
-          # Keyball61の標準配列: { GP20, GP19, GP18, GP15, GP14, GP13 }
+          # COL3をGP15からGP17へ変更したピン配列を上書き
           echo "#define MATRIX_COL_PINS { GP20, GP19, GP18, GP17, GP14, GP13 }" >> keyboards/keyball/keyball61/config.h
 
       - name: Compile Keyball61
