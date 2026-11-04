@@ -1,0 +1,45 @@
+name: Build Keyball61 RP2040
+
+on:
+  workflow_dispatch: # 手動実行用
+  push:
+    branches:
+      - keyball61-rp2040 # このブランチにプッシュされた時も自動ビルド
+    paths:
+      - 'keyboards/keyball/**' # keyball ディレクトリに変更があった場合
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # QMK公式のビルド用Dockerイメージを使用
+    container: qmkfm/qmk_cli:latest
+
+    steps:
+      # 1. リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # サブモジュール（QMK本体など）も同時に取得
+
+      # 2. QMK環境のセットアップとクリーン
+      - name: Setup QMK Environment
+        run: |
+          qmk setup -y
+          qmk clean
+
+      # 3. Keyball61 (RP2040) のコンパイル
+      # ※ リポジトリ内の正確なフォルダ名に合わせてターゲットを指定します
+      - name: Compile Keyball61
+        run: |
+          qmk compile -kb keyball/keyball61 -km default
+
+      # 4. コンパイルされたファームウェア (.uf2) をArtifactとして保存
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyball61-rp2040-firmware
+          path: |
+            *.uf2
+            *.hex
+            *.bin
+          if-no-files-found: error
