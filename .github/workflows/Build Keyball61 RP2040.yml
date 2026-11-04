@@ -4,22 +4,22 @@ on:
   workflow_dispatch: # 手動実行用
   push:
     branches:
-      - keyball61-rp2040 # このブランチにプッシュされた時も自動ビルド
+      - keyball61-rp2040
     paths:
-      - 'keyboards/keyball/**' # keyball ディレクトリに変更があった場合
+      - 'keyboards/keyball/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # QMK公式のビルド用Dockerイメージを使用
-    container: qmkfm/qmk_cli:latest
+    # 【修正箇所】最新(latest)ではなく、安定版のバージョンを指定して環境の衝突を防ぎます
+    container: qmkfm/qmk_cli:0.26.11
 
     steps:
       # 1. リポジトリのチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive # サブモジュール（QMK本体など）も同時に取得
+          submodules: recursive
 
       # 2. QMK環境のセットアップとクリーン
       - name: Setup QMK Environment
@@ -28,7 +28,6 @@ jobs:
           qmk clean
 
       # 3. Keyball61 (RP2040) のコンパイル
-      # ※ リポジトリ内の正確なフォルダ名に合わせてターゲットを指定します
       - name: Compile Keyball61
         run: |
           qmk compile -kb keyball/keyball61 -km default
