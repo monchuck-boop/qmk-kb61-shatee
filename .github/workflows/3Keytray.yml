@@ -1,4 +1,4 @@
-name: Force Fix Keyball61 Right Thumb Only
+name: Build Keyball61 Right Hand Only
 
 on:
   workflow_dispatch: # 手動実行用
@@ -27,52 +27,15 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 【完全上書き】汚れたkeyball61.cを強制リセットし、トラックボールを安全に遮断
-      - name: Force Rewrite for Pure Keyboard Matrix
-        run: |
-          CONFIG_FILE="keyboards/keyball/keyball61/config.h"
-          RULES_FILE="keyboards/keyball/keyball61/rules.mk"
-          KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
-          
-          # 汚れてしまった keyball61.c の中身を正しいCコードで強制的に上書きリセット
-          echo "==== Resetting corrupted keyball61.c ===="
-          mkdir -p keyboards/keyball/keyball61
-          echo '#include "keyball61.h"' > keyboards/keyball/keyball61/keyball61.c
-          
-          # A. config.h の設定（右手を主役にし、左手との通信を完全遮断 ＆ トラックボール不要マクロ）
-          if [ -f "$CONFIG_FILE" ]; then
-            echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
-            echo "#define SPLIT_USB_DETECT" >> "$CONFIG_FILE"
-            echo "#define FORWARD_EECONFIG" >> "$CONFIG_FILE"
-            echo "#define NO_TRACKBALL" >> "$CONFIG_FILE"
-          fi
-          
-          # B. rules.mk の設定（RP2040への切り替えと、エラーの原因をオフ）
-          if [ -f "$RULES_FILE" ]; then
-            sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
-            sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
-            
-            sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' "$RULES_FILE"
-            sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = no/g' "$RULES_FILE"
-            sed -i 's/PMW3360_ENABLE =.*/PMW3360_ENABLE = no/g' "$RULES_FILE"
-            sed -i 's/RGBLIGHT_ENABLE =.*/RGBLIGHT_ENABLE = no/g' "$RULES_FILE"
-            sed -i 's/VIA_ENABLE =.*/VIA_ENABLE = no/g' "$RULES_FILE"
-          fi
-          
-          # C. keymap.c 内のトラックボール関連命令を削除・無効化
-          if [ -f "$KEYMAP_FILE" ]; then
-            sed -i 's/keyball_set_scroll_mode/\/\/ keyball_set_scroll_mode/g' "$KEYMAP_FILE"
-          fi
-
-      # 5. コンパイルの実行
+      # 4. コンパイルの実行（リポジトリの現在の設定でそのままビルドします）
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
 
-      # 6. 生成されたファームウェア (.uf2) を保存
+      # 5. 生成されたファームウェア (.uf2) を保存
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: keyball61-rp2040-thumb-only
+          name: keyball61-rp2040-firmware
           path: |
             *.uf2
             .build/*.uf2
