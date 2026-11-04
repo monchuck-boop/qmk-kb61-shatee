@@ -1,0 +1,25 @@
+# Keyball61 Right Hand Single Build (MISO rewired to GP17)
+keyboard_name: "Keyball61 Right Single"
+url: ""
+maintainer: "qmk"
+width: 15
+height: 5
+
+development_board: rp2040
+
+matrix_pins:
+  direct: null
+  cols: [GP20, GP19, GP18, GP17, GP14, GP13] # COL3をGP15からGP17に変更
+  rows: [GP12, GP11, GP10, GP9, GP8]
+
+split:
+  enabled: false # 単独動作（片手）のためスプリット機能を無効化
+
+trackball:
+  enabled: true
+  driver: pmw3360
+  # SPIピンの定義：MISOと競合していたCOL3を逃がしたため、標準のSPIピン(GP15)をそのまま使用可能
+  miso_pin: GP15 
+  sclk_pin: GP14
+  mosi_pin: GP16
+  cs_pin: GP13
