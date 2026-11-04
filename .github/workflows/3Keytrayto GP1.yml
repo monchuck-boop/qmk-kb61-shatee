@@ -1,25 +1,26 @@
-# Keyball61 Right Hand Single Build (MISO rewired to GP17)
-keyboard_name: "Keyball61 Right Single"
-url: ""
-maintainer: "qmk"
-width: 15
-height: 5
+name: Build Keyball61 Right Hand Only
 
-development_board: rp2040
+on:
+  workflow_dispatch:
 
-matrix_pins:
-  direct: null
-  cols: [GP20, GP19, GP18, GP17, GP14, GP13] # COL3をGP15からGP17に変更
-  rows: [GP12, GP11, GP10, GP9, GP8]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli:latest
 
-split:
-  enabled: false # 単独動作（片手）のためスプリット機能を無効化
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-trackball:
-  enabled: true
-  driver: pmw3360
-  # SPIピンの定義：MISOと競合していたCOL3を逃がしたため、標準のSPIピン(GP15)をそのまま使用可能
-  miso_pin: GP15 
-  sclk_pin: GP14
-  mosi_pin: GP16
-  cs_pin: GP13
+      - name: Disable git safe directory checks
+        run: git config --global --add safe.directory '*'
+
+      - name: Fix QMK CLI Internal Python Bug & Configure Hardware
+        run: |
+          SYS_MATH_PY="/usr/local/lib/python3.14/site-packages/qmk/math.py"
+          [ -f "$SYS_MATH_PY" ] && sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$SYS_MATH_PY"
+
+      - name: Compile Keyball61
+        run: qmk compile -kb keyball/keyball61 -km default
