@@ -64,6 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 #define MASTER_RIGHT
 
+
+#define MASTER_RIGHT
+#define SPLIT_USB_DETECT
+#define NO_TRACKBALL
+
 #ifdef OLED_ENABLE
 #    define SPLIT_OLED_ENABLE
 #endif
