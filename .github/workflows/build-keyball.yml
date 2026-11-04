@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # 安定したPython 3.10環境が含まれるUbuntu
+    runs-on: ubuntu-latest # 最新の環境を使用
 
     steps:
       # 1. リポジトリのチェックアウト
@@ -19,31 +19,40 @@ jobs:
         with:
           submodules: recursive
 
-      # 2. 必要なPythonバージョン(3.10)を明示的にセットアップ
-      - name: Set up Python 3.10
+      # 2. 最新の Python と QMK 環境のセットアップ
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12' # 安定したバージョンを指定
 
-      # 3. QMK CLIと依存関係のインストール
-      - name: Install QMK CLI and dependencies
+      # 3. 必要な依存関係とクロスコンパイラのインストール
+      - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install qmk
+          python3 -m pip install qmk dotty-dict milc
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
 
-      # 4. QMK環境の初期化
+      # 4. 【重要】エラーの原因となるリポジトリ内の古い python コードを直接書き換える
+      # ast.Num を最新の Python でも動く ast.Constant に置換します
+      - name: Patch QMK Python Math Script
+        run: |
+          if [ -f "lib/python/qmk/math.py" ]; then
+            echo "Patching lib/python/qmk/math.py..."
+            sed -i 's/ast.Num/ast.Constant/g' lib/python/qmk/math.py
+          fi
+
+      # 5. QMK環境の初期化
       - name: Setup QMK Environment
         run: |
           qmk setup -y
 
-      # 5. Keyball61 (RP2040) のコンパイル
+      # 6. Keyball61 (RP2040) のコンパイル
       - name: Compile Keyball61
         run: |
           qmk compile -kb keyball/keyball61 -km default
 
-      # 6. コンパイルされたファームウェア (.uf2) を保存
+      # 7. コンパイルされたファームウェア (.uf2) をArtifactとして保存
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
