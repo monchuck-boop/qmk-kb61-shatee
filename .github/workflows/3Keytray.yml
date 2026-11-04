@@ -1,4 +1,4 @@
-name: Fix Keyball61 Right Thumb Only 3Keytray
+name: Fix Keyball61 Right Thumb Only (RP2040)
 
 on:
   workflow_dispatch: # 手動実行用
