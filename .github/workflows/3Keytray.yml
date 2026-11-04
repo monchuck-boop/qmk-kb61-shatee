@@ -22,8 +22,12 @@ jobs:
           SYS_MATH_PY="/usr/local/lib/python3.14/site-packages/qmk/math.py"
           [ -f "$SYS_MATH_PY" ] && sed -i 's/ast.Num/ast.Constant/g; s/node.n/node.value/g' "$SYS_MATH_PY"
           
+          # 右手単独動作のための設定
           echo "#define MASTER_RIGHT" >> keyboards/keyball/keyball61/config.h
-          echo "#define MATRIX_COL_PINS { GP4, GP5, GP6, GP15 }" >> keyboards/keyball/keyball61/config.h
+          
+          # COL3をGP15からGP17へ変更（配列の4番目をGP17に書き換え）
+          # Keyball61の標準配列: { GP20, GP19, GP18, GP15, GP14, GP13 }
+          echo "#define MATRIX_COL_PINS { GP20, GP19, GP18, GP17, GP14, GP13 }" >> keyboards/keyball/keyball61/config.h
 
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
