@@ -11,8 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 【修正箇所】最新(latest)ではなく、安定版のバージョンを指定して環境の衝突を防ぎます
-    container: qmkfm/qmk_cli:0.26.11
+    # 【修正箇所】確実に存在する過去の安定タグ "1.2.0" を指定
+    container: qmkfm/qmk_cli:1.2.0
 
     steps:
       # 1. リポジトリのチェックアウト
