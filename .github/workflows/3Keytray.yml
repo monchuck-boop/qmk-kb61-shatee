@@ -1,7 +1,7 @@
 name: Build Keyball61 Right Hand Only
 
 on:
-  workflow_dispatch: # 手動実行用
+  workflow_dispatch:
 
 jobs:
   build:
@@ -9,77 +9,17 @@ jobs:
     container: ghcr.io/qmk/qmk_cli:latest
 
     steps:
-      # 1. リポジトリのチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # 2. パーミッションエラー防止
       - name: Disable git safe directory checks
         run: git config --global --add safe.directory '*'
 
-      # 3. Pythonスクリプトのバグ修正（ast.Numエラー対策）
-      - name: Patch repository qmk math script
-        run: |
-          if [ -f "lib/python/qmk/math.py" ]; then
-            sed -i 's/ast.Num/ast.Constant/g' lib/python/qmk/math.py
-            sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
-          fi
-
-      # 4. 【完全絶対命令】汚れた全ファイルをピンポイントで強制初期化 ＆ 右手単独・RP2040化
-      - name: Force Reset Corrupted Files
-        run: |
-          echo "==== [1/3] 汚れた keyball61.c を物理的に完全上書きリセット ===="
-          echo '#include "keyball61.h"' > keyboards/keyball/keyball61/keyball61.c
-          
-          echo "==== [2/3] 共通ライブラリ keyball.c のエラーを強制バイパス ===="
-          echo '#include "quantum.h"' > keyboards/keyball/lib/keyball/keyball.c
-          echo 'void keyboard_pre_init_kb(void) { keyboard_pre_init_user(); }' >> keyboards/keyball/lib/keyball/keyball.c
-          echo 'void keyboard_post_init_kb(void) { keyboard_post_init_user(); }' >> keyboards/keyball/lib/keyball/keyball.c
-          echo 'void matrix_init_kb(void) { matrix_init_user(); }' >> keyboards/keyball/lib/keyball/keyball.c
-          echo 'void matrix_scan_kb(void) { matrix_scan_user(); }' >> keyboards/keyball/lib/keyball/keyball.c
-          echo 'bool process_record_kb(uint16_t keycode, keyrecord_t *record) { return process_record_user(keycode, record); }' >> keyboards/keyball/lib/keyball/keyball.c
-          
-          echo "==== [3/3] 汚れた keymap.c を純正デフォルト配列で完全強制上書き ===="
-          mkdir -p keyboards/keyball/keyball61/keymaps/default
-          cat << 'EOF' > keyboards/keyball/keyball61/keymaps/default/keymap.c
-#include QMK_KEYBOARD_H
-
-const uint16_t PROGMEM keymaps[MATRIX_ROWS][MATRIX_COLS] = {
-    [0] = LAYOUT_aesop(
-        KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,                      KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_BSPC,
-        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                      KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_MINS,
-        KC_LCTL, KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                      KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,
-        KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_LBRC, KC_RBRC, KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_ENT,
-                                   KC_LGUI, KC_LALT, KC_SPC,                    KC_SPC,  KC_RALT, KC_RGUI
-    )
-};
-
-void keyboard_post_init_user(void) {
-    // トラックボールエラー回避用の空関数
-}
-EOF
-
-          echo "==== [4/4] config.h と rules.mk を右手単独・RP2040用に強制定義 ===="
-          echo "#define MASTER_RIGHT" >> keyboards/keyball/keyball61/config.h
-          echo "#define SPLIT_USB_DETECT" >> keyboards/keyball/keyball61/config.h
-          echo "#define FORWARD_EECONFIG" >> keyboards/keyball/keyball61/config.h
-          echo "#define NO_TRACKBALL" >> keyboards/keyball/keyball61/config.h
-          
-          sed -i 's/MCU =.*/MCU = RP2040/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = no/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/PMW3360_ENABLE =.*/PMW3360_ENABLE = no/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/RGBLIGHT_ENABLE =.*/RGBLIGHT_ENABLE = no/g' keyboards/keyball/keyball61/rules.mk
-          sed -i 's/VIA_ENABLE =.*/VIA_ENABLE = no/g' keyboards/keyball/keyball61/rules.mk
-
-      # 5. コンパイルの実行
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
 
-      # 6. 生成されたファームウェア (.uf2) を保存
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
