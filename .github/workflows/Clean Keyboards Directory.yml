@@ -1,0 +1,50 @@
+name: Clean Keyboards Directory
+
+on:
+  workflow_dispatch: # 手動実行用
+
+jobs:
+  clean-up:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 指定されたリポジトリとブランチをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: keyball61-rp2040 # 対象のブランチ名
+          fetch-depth: 1
+
+      # 2. keyball 以外のディレクトリやファイルを削除
+      - name: Remove keyboards except Keyball
+        run: |
+          cd keyboards
+          
+          # keyball または keyball61 という名前が含まれるもの「以外」をすべて削除
+          # ※ 大文字小文字を区別しない場合は、shopt -s nocaseglob を有効にしています
+          shopt -s nocaseglob
+          
+          for dir in *; do
+            if [[ "$dir" != *keyball* ]]; then
+              echo "Deleting: $dir"
+              rm -rf "$dir"
+            fi
+          done
+          
+          ls -la # 残ったファイルを確認用に出力
+
+      # 3. 変更をリポジトリにコミットしてプッシュ
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          git add keyboards/
+          
+          # 変更がある場合のみコミットしてプッシュ
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Keep only Keyball in keyboards directory"
+            git push origin keyball61-rp2040
+          else
+            echo "No changes to commit"
+          fi
