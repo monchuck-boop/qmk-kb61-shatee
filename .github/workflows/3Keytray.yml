@@ -27,19 +27,17 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. 【完全自動修復】汚れたCファイルを自動リセットし、トラックボールを安全に遮断
+      # 4. 【完全上書き】汚れたkeyball61.cを強制リセットし、トラックボールを安全に遮断
       - name: Force Rewrite for Pure Keyboard Matrix
         run: |
-          KEYBALL61_C="keyboards/keyball/keyball61/keyball61.c"
           CONFIG_FILE="keyboards/keyball/keyball61/config.h"
           RULES_FILE="keyboards/keyball/keyball61/rules.mk"
           KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
           
-          # 【最重要】エラーの原因になっている汚れた keyball61.c を、ビルド直前に自動で完全リセット
-          if [ -f "$KEYBALL_61_C" ] || [ -f "keyboards/keyball/keyball61/keyball61.c" ]; then
-            echo "==== Resetting corrupted keyball61.c ===="
-            echo '#include "keyball61.h"' > keyboards/keyball/keyball61/keyball61.c
-          fi
+          # 汚れてしまった keyball61.c の中身を正しいCコードで強制的に上書きリセット
+          echo "==== Resetting corrupted keyball61.c ===="
+          mkdir -p keyboards/keyball/keyball61
+          echo '#include "keyball61.h"' > keyboards/keyball/keyball61/keyball61.c
           
           # A. config.h の設定（右手を主役にし、左手との通信を完全遮断 ＆ トラックボール不要マクロ）
           if [ -f "$CONFIG_FILE" ]; then
