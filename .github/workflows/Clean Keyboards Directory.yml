@@ -8,42 +8,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 指定されたリポジトリとブランチをチェックアウト
+      # 1. リポジトリをチェックアウト（全履歴ではなく最新状態のみ）
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: keyball61-rp2040 # 対象のブランチ名
+          ref: keyball61-rp2040
           fetch-depth: 1
 
-      # 2. keyball 以外のディレクトリやファイルを削除
-      - name: Remove keyboards except Keyball
+      # 2. Git コマンドを使って keyball 以外を確実に削除
+      - name: Remove keyboards except Keyball via Git
         run: |
           cd keyboards
           
-          # keyball または keyball61 という名前が含まれるもの「以外」をすべて削除
-          # ※ 大文字小文字を区別しない場合は、shopt -s nocaseglob を有効にしています
+          # 大文字小文字を区別せずにマッチング
           shopt -s nocaseglob
           
-          for dir in *; do
-            if [[ "$dir" != *keyball* ]]; then
-              echo "Deleting: $dir"
-              rm -rf "$dir"
+          # keyboards 直下のディレクトリ・ファイルをループ
+          for item in *; do
+            # 名前に "keyball" が含まれていない場合は Git から強制削除
+            if [[ "$item" != *keyball* ]]; then
+              echo "Git Removing: $item"
+              git rm -rf "$item"
             fi
           done
           
-          ls -la # 残ったファイルを確認用に出力
+          # 念のため、Git管理外の残骸も完全に消去
+          git clean -fdx
 
-      # 3. 変更をリポジトリにコミットしてプッシュ
+      # 3. 変更をコミットしてプッシュ
       - name: Commit and Push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          git add keyboards/
+          # 削除（変更）をすべてステージング
+          git add -A
           
-          # 変更がある場合のみコミットしてプッシュ
           if ! git diff-index --quiet HEAD; then
-            git commit -m "Keep only Keyball in keyboards directory"
+            git commit -m "Force remove all keyboards except Keyball"
             git push origin keyball61-rp2040
           else
             echo "No changes to commit"
