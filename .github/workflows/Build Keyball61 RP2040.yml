@@ -1,16 +1,16 @@
-name: Build Keyball61 RP2040
+name: Build Keyball61 via Container
 
 on:
   workflow_dispatch: # 手動実行用
   push:
     branches:
       - keyball61-rp2040
-    paths:
-      - 'keyboards/keyball/**'
 
 jobs:
   build:
-    runs-on: ubuntu-22.04 # 安定したPython 3.10環境が含まれるUbuntuバージョンを指定
+    runs-on: ubuntu-latest
+    # QMK公式の隔離された安全なコンテナを使用（システム側のPython3.14の影響を完全にシャットアウト）
+    container: ghcr.io/qmk/qmk_cli:latest
 
     steps:
       # 1. リポジトリのチェックアウト
@@ -19,36 +19,27 @@ jobs:
         with:
           submodules: recursive
 
-      # 2. 必要なPythonバージョン(3.10)を明示的にセットアップ（これでast.Numエラーを完全回避）
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+      # 2. ディレクトリのパーミッションエラーを防ぐ設定
+      - name: Disable git safe directory checks
+        run: git config --global --add safe.directory '*'
 
-      # 3. QMK CLIと依存関係のインストール
-      - name: Install QMK CLI and dependencies
+      # 3. 万が一に備えて、リポジトリ内の古いPythonスクリプトのバグ部分も強制自動修正
+      - name: Patch repository qmk math script
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install qmk
-          # Linux用のクロスコンパイル環境（RP2040用）をインストール
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi
+          if [ -f "lib/python/qmk/math.py" ]; then
+            sed -i 's/ast.Num/ast.Constant/g' lib/python/qmk/math.py
+            sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
+          fi
 
-      # 4. QMK環境の初期化
-      - name: Setup QMK Environment
-        run: |
-          qmk setup -y
-
-      # 5. Keyball61 (RP2040) のコンパイル
+      # 4. コンテナ内部のQMKで安全にコンパイル
       - name: Compile Keyball61
-        run: |
-          qmk compile -kb keyball/keyball61 -km default
+        run: qmk compile -kb keyball/keyball61 -km default
 
-      # 6. コンパイルされたファームウェア (.uf2) をArtifactとして保存
+      # 5. コンパイルされたファームウェア (.uf2) をダウンロード可能にする
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: keyball61-rp2040-firmware
+          name: keyball61-firmware
           path: |
             *.uf2
             *.hex
