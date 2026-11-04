@@ -1,48 +1,86 @@
-/*
-Copyright 2021 @Yowkees
-Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
+name: Force Fix Keyball61 Right Thumb Only
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or
-(at your option) any later version.
+on:
+  workflow_dispatch: # 手動実行用
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/qmk/qmk_cli:latest
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+    steps:
+      # 1. リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-#include QMK_KEYBOARD_H
+      # 2. パーミッションエラー防止
+      - name: Disable git safe directory checks
+        run: git config --global --add safe.directory '*'
 
-#include "lib/keyball/keyball.h"
+      # 3. Pythonスクリプトのバグ修正（ast.Numエラー対策）
+      - name: Patch repository qmk math script
+        run: |
+          if [ -f "lib/python/qmk/math.py" ]; then
+            sed -i 's/ast.Num/ast.Constant/g' lib/python/qmk/math.py
+            sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
+          fi
 
-//////////////////////////////////////////////////////////////////////////////
+      # 4. 【回路修正】回路の初期化は残し、トラックボールのエラー原因だけを消去
+      - name: Force Rewrite for Pure Keyboard Matrix
+        run: |
+          CONFIG_FILE="keyboards/keyball/keyball61/config.h"
+          RULES_FILE="keyboards/keyball/keyball61/rules.mk"
+          KEYMAP_FILE="keyboards/keyball/keyball61/keymaps/default/keymap.c"
+          KEYBALL_C="keyboards/keyball/lib/keyball/keyball.c"
+          
+          # A. config.h の設定（右手を主役にし、左手との通信を完全遮断）
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "Configuring config.h..."
+            echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
+            echo "#define SPLIT_USB_DETECT" >> "$CONFIG_FILE"
+            echo "#define FORWARD_EECONFIG" >> "$CONFIG_FILE"
+          fi
+          
+          # B. rules.mk の設定（RP2040への切り替えと、エラーの原因をオフ）
+          if [ -f "$RULES_FILE" ]; then
+            echo "Configuring rules.mk..."
+            sed -i 's/MCU =.*/MCU = RP2040/g' "$RULES_FILE"
+            sed -i 's/BOOTLOADER =.*/BOOTLOADER = rp2040/g' "$RULES_FILE"
+            
+            sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' "$RULES_FILE"
+            sed -i 's/POINTING_DEVICE_ENABLE =.*/POINTING_DEVICE_ENABLE = no/g' "$RULES_FILE"
+            sed -i 's/PMW3360_ENABLE =.*/PMW3360_ENABLE = no/g' "$RULES_FILE"
+            sed -i 's/RGBLIGHT_ENABLE =.*/RGBLIGHT_ENABLE = no/g' "$RULES_FILE"
+            sed -i 's/VIA_ENABLE =.*/VIA_ENABLE = no/g' "$RULES_FILE"
+          fi
+          
+          # C. 【重要】keyball.c からトラックボールのエラーを吐く行（pmw33xxなど）だけをピンポイントで消去
+          # キー回路の初期化（duplexmatrix_init）は絶対に消さずに残します
+          if [ -f "$KEYBALL_C" ]; then
+            echo "Removing pointing device codes from keyball.c but keeping matrix init..."
+            sed -i '/pmw33xx/d' "$KEYBALL_C"
+            sed -i '/pointing_device/d' "$KEYBALL_C"
+            sed -i '/keyball_set_scroll_mode/d' "$KEYBALL_C"
+          fi
+          
+          # D. keymap.c 内のトラックボール命令をコメントアウト
+          if [ -f "$KEYMAP_FILE" ]; then
+            echo "Patching keymap.c to remove keyball_set_scroll_mode..."
+            sed -i 's/keyball_set_scroll_mode/\/\/ keyball_set_scroll_mode/g' "$KEYMAP_FILE"
+          fi
 
-// clang-format off
-matrix_row_t matrix_mask[MATRIX_ROWS] = {
-    0b01110111,
-    0b01110111,
-    0b01110111,
-    0b11110111,
-    0b11110111,
-    0b01110111,
-    0b01110111,
-    0b01110111,
-    0b11110111,
-    0b11110111,
-};
-// clang-format on
+      # 5. コンパイルの実行
+      - name: Compile Keyball61
+        run: qmk compile -kb keyball/keyball61 -km default
 
-void keyball_on_adjust_layout(keyball_adjust_t v) {
-#ifdef RGBLIGHT_ENABLE
-    // adjust RGBLIGHT's clipping and effect ranges
-    uint8_t lednum_this = keyball.this_have_ball ? 34 : 37;
-    uint8_t lednum_that = !keyball.that_enable ? 0 : keyball.that_have_ball ? 34 : 37;
-    rgblight_set_clipping_range(is_keyboard_left() ? 0 : lednum_that, lednum_this);
-    rgblight_set_effect_range(0, lednum_this + lednum_that);
-#endif
-}
+      # 6. 生成されたファームウェア (.uf2) を保存
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyball61-rp2040-thumb-only
+          path: |
+            *.uf2
+            .build/*.uf2
+          if-no-files-found: error
