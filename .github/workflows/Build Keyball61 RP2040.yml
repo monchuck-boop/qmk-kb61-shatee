@@ -1,15 +1,11 @@
-name: Build Keyball61 via Container
+name: Build Keyball61 Right Hand Single Mode
 
 on:
   workflow_dispatch: # 手動実行用
-  push:
-    branches:
-      - keyball61-rp2040
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # QMK公式の隔離された安全なコンテナを使用（システム側のPython3.14の影響を完全にシャットアウト）
     container: ghcr.io/qmk/qmk_cli:latest
 
     steps:
@@ -19,11 +15,11 @@ jobs:
         with:
           submodules: recursive
 
-      # 2. ディレクトリのパーミッションエラーを防ぐ設定
+      # 2. ディレクトリのパーミッションエラー防止
       - name: Disable git safe directory checks
         run: git config --global --add safe.directory '*'
 
-      # 3. 万が一に備えて、リポジトリ内の古いPythonスクリプトのバグ部分も強制自動修正
+      # 3. Pythonスクリプトのバグ修正パッチ（ast.Numエラー対策）
       - name: Patch repository qmk math script
         run: |
           if [ -f "lib/python/qmk/math.py" ]; then
@@ -31,15 +27,37 @@ jobs:
             sed -i 's/node.n/node.value/g' lib/python/qmk/math.py
           fi
 
-      # 4. コンテナ内部のQMKで安全にコンパイル
+      # 4. 【最重要】右手単独（片手マスター）モードへの設定書き換え
+      # config.h に MASTER_RIGHT を強制挿入し、rules.mk のスプリットを無効化します
+      - name: Configure for Right Hand Single Mode
+        run: |
+          CONFIG_FILE="keyboards/keyball/keyball61/config.h"
+          RULES_FILE="keyboards/keyball/keyball61/rules.mk"
+          
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "Setting MASTER_RIGHT in config.h..."
+            echo "#define MASTER_RIGHT" >> "$CONFIG_FILE"
+          fi
+          
+          if [ -f "$RULES_FILE" ]; then
+            echo "Disabling SPLIT_KEYBOARD in rules.mk..."
+            # 既存の SPLIT_KEYBOARD_ENABLE を no に書き換えるか、無ければ追記
+            if grep -q "SPLIT_KEYBOARD_ENABLE" "$RULES_FILE"; then
+              sed -i 's/SPLIT_KEYBOARD_ENABLE =.*/SPLIT_KEYBOARD_ENABLE = no/g' "$RULES_FILE"
+            else
+              echo "SPLIT_KEYBOARD_ENABLE = no" >> "$RULES_FILE"
+            fi
+          fi
+
+      # 5. コンパイルの実行
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
 
-      # 5. コンパイルされたファームウェア (.uf2) をダウンロード可能にする
+      # 6. ファームウェアの保存
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         with:
-          name: keyball61-firmware
+          name: keyball61-right-single-firmware
           path: |
             *.uf2
             *.hex
