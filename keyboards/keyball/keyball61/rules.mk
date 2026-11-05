@@ -1,46 +1,27 @@
-# Build Options
+# MCU specifications
+MCU = RP2040
 BOOTLOADER = rp2040
-BOOTLOADER_TYPE = rp2040
-BOOTMAGIC_ENABLE = no       # Enable Bootmagic Lite
-EXTRAKEY_ENABLE = yes        # Audio control and System control
-CONSOLE_ENABLE = no         # Console for debug
-COMMAND_ENABLE = no         # Commands for debug and configuration
-NKRO_ENABLE = no            # Enable N-Key Rollover
-BACKLIGHT_ENABLE = no       # Enable keyboard backlight functionality
-AUDIO_ENABLE = no           # Audio output
 
-# Duplex matrix.
-CUSTOM_MATRIX = lite
-SRC += lib/duplexmatrix/duplexmatrix.c
+# Features
+BOOTMAGIC_ENABLE = yes
+MOUSEKEY_ENABLE = no
+EXTRAKEY_ENABLE = yes
+CONSOLE_ENABLE = no
+COMMAND_ENABLE = no
+BACKLIGHT_ENABLE = no
+RGBLIGHT_ENABLE = yes
+NKRO_ENABLE = yes
+LTO_ENABLE = yes
 
-# Press is immediate after duplex press-stable filter; release waits to settle.
-# asym_eager_defer_pk keeps fast rolls like "out"/"tou" in order (sym_defer_pk caused "otu").
-DEBOUNCE_TYPE = asym_eager_defer_pk
+# Split keyboard settings
+SPLIT_KEYBOARD = yes
 
-# Split keyboard.
-SERIAL_DRIVER = vendor
-
-# Optical sensor driver for trackball.
+# Pointing Device (光学センサーの切り替え)
 POINTING_DEVICE_ENABLE = yes
-POINTING_DEVICE_DRIVER = pmw3360
+PMW3360_ENABLE = no
+PMW3610_ENABLE = yes
+V_BIT_REDUCTION_ENABLE = yes
 
-MOUSEKEY_ENABLE = yes
-
-# Enabled only one of RGBLIGHT and RGB_MATRIX if necessary.
-RGBLIGHT_ENABLE = no        # Enable RGBLIGHT
-RGB_MATRIX_ENABLE = no      # Enable RGB_MATRIX (not work yet)
-RGB_MATRIX_DRIVER = ws2812
-
-# Do not enable SLEEP_LED_ENABLE. it uses the same timer as BACKLIGHT_ENABLE
-SLEEP_LED_ENABLE = no       # Breathing sleep LED during USB suspend
-
-# To support OLED
-OLED_ENABLE = no                # Please Enable this in each keymaps.
-SRC += lib/oledkit/oledkit.c    # OLED utility for Keyball series.
-
-# Include common library
-SRC += lib/keyball/keyball.c
-
-# Disable other features to squeeze firmware size
-SPACE_CADET_ENABLE = no
-MAGIC_ENABLE = no
+# Vial settings
+VIAL_ENABLE = yes
+LTO_ENABLE = yes
