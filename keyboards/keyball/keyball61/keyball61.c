@@ -46,3 +46,10 @@ void keyball_on_adjust_layout(keyball_adjust_t v) {
     rgblight_set_effect_range(0, lednum_this + lednum_that);
 #endif
 }
+
+
+void pointing_device_init_kb(void) {
+    // 既存の pmw3360_init() をコメントアウトまたは削除し、以下に変更
+    pmw3610_init();
+    // pmw3610_set_cpi(1600); // 必要に応じて初期CPI(DPI)を設定
+}
