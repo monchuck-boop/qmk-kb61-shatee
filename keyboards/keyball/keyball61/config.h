@@ -67,3 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef OLED_ENABLE
 #    define SPLIT_OLED_ENABLE
 #endif
+
+
+#define PMW3610_DPI 1600
