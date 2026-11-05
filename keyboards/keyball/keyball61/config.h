@@ -71,3 +71,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SPLIT_HAND_PIN GP22 
 #define PMW3610_DPI 1600
 #define MASTER_RIGHT
+#pragma once
+
+// 1. PMW3610用の設定（GP11をセンサー通信から外す）
+#undef PMW3360_CS_PIN
+#define PMW3610_CS_PIN GP12
+#define PMW3610_SPI_SCLK GP10
+#define PMW3610_SPI_MOSI GP11 // 1線式にするため、MOSIとMISOを同じGP11にする方法もありますが、
+#define PMW3610_SPI_MISO GP11 // もしGP11をCOL3に使うなら、センサーはGP10等で1線通信させる必要があります。
+
+#pragma once
+
+// 既存のPMW3360ピン定義をすべてクリア（無効化）
+#undef PMW3360_CS_PIN
+#undef PMW3360_SPI_SCLK
+#undef PMW3360_SPI_MOSI
+#undef PMW3360_SPI_MISO
+
+// === PMW3610 1線通信（SDIO）用のピンアサイン ===
+#define PMW3610_CS_PIN    GP12  // チップセレクト
+#define PMW3610_SPI_SCLK  GP10  // クロック
+#define PMW3610_SPI_MOSI  GP10  // データ線（SDIO）をGP10に割り当て
+#define PMW3610_SPI_MISO  GP10  // MISOも同じGP10を指定することでQMK側が1線モードで動作
+
+// 必要に応じて初期DPIを設定
+#define PMW3610_DPI 1600
+
