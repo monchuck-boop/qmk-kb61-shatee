@@ -1,6 +1,6 @@
 # MCU specifications
-MCU = RP2040
-BOOTLOADER = rp2040
+# (rp2040用のサブディレクトリ構成を読み込ませるための元々の設定を維持)
+include $(DIRECTORY_PATH)/rp2040/rules.mk
 
 # Features
 BOOTMAGIC_ENABLE = yes
@@ -22,6 +22,3 @@ PMW3360_ENABLE = no
 PMW3610_ENABLE = yes
 V_BIT_REDUCTION_ENABLE = yes
 
-# Vial settings
-VIAL_ENABLE = yes
-LTO_ENABLE = yes
