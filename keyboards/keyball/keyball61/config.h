@@ -68,5 +68,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #    define SPLIT_OLED_ENABLE
 #endif
 
-
+#define SPLIT_HAND_PIN GP22 
 #define PMW3610_DPI 1600
