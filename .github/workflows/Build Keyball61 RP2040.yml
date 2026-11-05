@@ -34,6 +34,7 @@ jobs:
       # 4. コンテナ内部のQMKで安全にコンパイル
       - name: Compile Keyball61
         run: qmk compile -kb keyball/keyball61 -km default
+　　　　　　　qmk compile -kb keyball/keyball61 -km default
 
       # 5. コンパイルされたファームウェア (.uf2) をダウンロード可能にする
       - name: Upload firmware artifact
